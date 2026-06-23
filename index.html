@@ -85,79 +85,68 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
     <script>
-        // ⚠️ ВСТАВЬ СВОЙ КОНФИГ (из Firebase)
-        const firebaseConfig = {
-            apiKey: "AIzaSyA6LQ97ZLXqQSUa_ExUi2l1F_gALo4gYHE",
+const firebaseConfig = {
+apiKey: "AIzaSyA6LQ97ZLXqQSUa_ExUi2l1F_gALo4gYHE",
   authDomain: "govnomessage.firebaseapp.com",
   projectId: "govnomessage",
   storageBucket: "govnomessage.firebasestorage.app",
   messagingSenderId: "249971075712",
   appId: "1:249971075712:web:58cf85d652942b8c6a9465"
-        };
+};
 
-        // Инициализация
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+// Выводим статус в специальный блок
+const statusDiv = document.getElementById('status');
+statusDiv.textContent = '🔄 Инициализация...';
 
-        const chatDiv = document.getElementById('chat');
-        const nameInput = document.getElementById('nameInput');
-        const msgInput = document.getElementById('msgInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const statusDiv = document.getElementById('status');
+try {
+    firebase.initializeApp(firebaseConfig);
+    statusDiv.textContent = '✅ Firebase OK';
+} catch (e) {
+    statusDiv.textContent = '❌ Ошибка: ' + e.message;
+    throw e;
+}
 
-        // Загружаем имя
-        if (localStorage.getItem('userName')) {
-            nameInput.value = localStorage.getItem('userName');
-        }
+const db = firebase.firestore();
 
-        // Отправка
-        async function sendMessage() {
-            const name = nameInput.value.trim() || 'Аноним';
-            const text = msgInput.value.trim();
-            if (!text) return;
+// Проверяем подключение к Firestore
+db.collection('messages').limit(1).get()
+    .then(() => {
+        statusDiv.textContent = '✅ Firestore OK';
+    })
+    .catch((err) => {
+        statusDiv.textContent = '❌ Firestore ошибка: ' + err.message;
+    });
 
-            try {
-                await db.collection('messages').add({
-                    name: name,
-                    text: text,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                msgInput.value = '';
-                localStorage.setItem('userName', name);
-                statusDiv.textContent = '✅ Отправлено';
-            } catch (e) {
-                statusDiv.textContent = '❌ ' + e.message;
-            }
-        }
+// Отправка сообщения
+const sendBtn = document.getElementById('sendBtn');
+const msgInput = document.getElementById('msgInput');
+const nameInput = document.getElementById('nameInput');
 
-        sendBtn.addEventListener('click', sendMessage);
-        msgInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') sendMessage();
+async function sendMessage() {
+    const name = nameInput.value.trim() || 'Аноним';
+    const text = msgInput.value.trim();
+    if (!text) {
+        statusDiv.textContent = '⚠️ Введите текст';
+        return;
+    }
+    statusDiv.textContent = '⏳ Отправка...';
+    try {
+        const docRef = await db.collection('messages').add({
+            name: name,
+            text: text,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
+        statusDiv.textContent = '✅ Успешно! ID: ' + docRef.id;
+        msgInput.value = '';
+    } catch (e) {
+        statusDiv.textContent = '❌ Ошибка: ' + e.message;
+    }
+}
 
-        // Получение сообщений
-        db.collection('messages')
-            .orderBy('timestamp', 'asc')
-            .onSnapshot((snapshot) => {
-                chatDiv.innerHTML = '';
-                if (snapshot.empty) {
-                    statusDiv.textContent = '📭 Нет сообщений';
-                    return;
-                }
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    const msgDiv = document.createElement('div');
-                    msgDiv.className = 'msg ' + (data.name === nameInput.value ? 'me' : 'other');
-                    msgDiv.innerHTML = `<span class="name">${data.name || 'Аноним'}</span> ${data.text || ''}`;
-                    chatDiv.appendChild(msgDiv);
-                });
-                chatDiv.scrollTop = chatDiv.scrollHeight;
-                statusDiv.textContent = '📨 ' + snapshot.size + ' сообщений';
-            }, (error) => {
-                statusDiv.textContent = '❌ Ошибка чтения: ' + error.message;
-            });
-
-        msgInput.focus();
+sendBtn.addEventListener('click', sendMessage);
+msgInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});
     </script>
 </body>
 </html>
