@@ -1,78 +1,149 @@
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мини-мессенджер</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 10px;
+        }
+        #chat {
+            flex: 1;
+            overflow-y: auto;
+            background: #fff;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+        }
+        .msg {
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .msg.me {
+            background: #dcf8c6;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .msg.other {
+            background: #fff;
+            border: 1px solid #ddd;
+        }
+        .msg .name {
+            font-weight: bold;
+            font-size: 0.8em;
+            color: #555;
+        }
+        #input-area {
+            display: flex;
+            gap: 8px;
+        }
+        #input-area input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            font-size: 16px;
+        }
+        #input-area button {
+            padding: 10px 20px;
+            background: #0084ff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .status {
+            text-align: center;
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat"></div>
+    <div id="input-area">
+        <input type="text" id="nameInput" placeholder="Ваше имя" style="flex:0.4;">
+        <input type="text" id="msgInput" placeholder="Сообщение..." autofocus>
+        <button id="sendBtn">➤</button>
+    </div>
+    <div id="status" class="status">Загрузка...</div>
 
-<script>
-    // ТВОЙ КОНФИГ (проверь, что все поля заполнены!)
-    const firebaseConfig = {
-        apiKey: "AIzaSyA6LQ97ZLXqQSUa_ExUi2l1F_gALo4gYHE",
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // ⚠️ ВСТАВЬ СВОЙ КОНФИГ (из Firebase)
+        const firebaseConfig = {
+            apiKey: "AIzaSyA6LQ97ZLXqQSUa_ExUi2l1F_gALo4gYHE",
   authDomain: "govnomessage.firebaseapp.com",
   projectId: "govnomessage",
   storageBucket: "govnomessage.firebasestorage.app",
   messagingSenderId: "249971075712",
   appId: "1:249971075712:web:58cf85d652942b8c6a9465"
-    };
+        };
 
-    // Инициализация
-    try {
+        // Инициализация
         firebase.initializeApp(firebaseConfig);
-        document.getElementById('status').textContent = '✅ Firebase инициализирован';
-    } catch (e) {
-        document.getElementById('status').textContent = '❌ Ошибка инициализации: ' + e.message;
-    }
+        const db = firebase.firestore();
 
-    const db = firebase.firestore();
+        const chatDiv = document.getElementById('chat');
+        const nameInput = document.getElementById('nameInput');
+        const msgInput = document.getElementById('msgInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const statusDiv = document.getElementById('status');
 
-    // Проверка подключения к Firestore
-    db.collection('messages').limit(1).get()
-        .then(() => {
-            document.getElementById('status').textContent = '✅ Подключение к Firestore успешно';
-        })
-        .catch((err) => {
-            document.getElementById('status').textContent = '❌ Ошибка подключения: ' + err.message;
+        // Загружаем имя
+        if (localStorage.getItem('userName')) {
+            nameInput.value = localStorage.getItem('userName');
+        }
+
+        // Отправка
+        async function sendMessage() {
+            const name = nameInput.value.trim() || 'Аноним';
+            const text = msgInput.value.trim();
+            if (!text) return;
+
+            try {
+                await db.collection('messages').add({
+                    name: name,
+                    text: text,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                msgInput.value = '';
+                localStorage.setItem('userName', name);
+                statusDiv.textContent = '✅ Отправлено';
+            } catch (e) {
+                statusDiv.textContent = '❌ ' + e.message;
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        msgInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendMessage();
         });
 
-    // DOM-элементы
-    const chatDiv = document.getElementById('chat');
-    const nameInput = document.getElementById('nameInput');
-    const msgInput = document.getElementById('msgInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const statusDiv = document.getElementById('status');
-
-    // Отправка сообщения
-    async function sendMessage() {
-        const name = nameInput.value.trim() || 'Аноним';
-        const text = msgInput.value.trim();
-        if (!text) return;
-
-        statusDiv.textContent = '⏳ Отправка...';
-        try {
-            const docRef = await db.collection('messages').add({
-                name: name,
-                text: text,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            statusDiv.textContent = '✅ Отправлено! ID: ' + docRef.id;
-            msgInput.value = '';
-            msgInput.focus();
-            localStorage.setItem('userName', name);
-        } catch (e) {
-            statusDiv.textContent = '❌ Ошибка: ' + e.message;
-        }
-    }
-
-    sendBtn.addEventListener('click', sendMessage);
-    msgInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') sendMessage();
-    });
-
-    // Чтение сообщений в реальном времени
-    db.collection('messages')
-        .orderBy('timestamp', 'asc')
-        .onSnapshot((snapshot) => {
-            chatDiv.innerHTML = '';
-            if (snapshot.empty) {
-                statusDiv.textContent = '📭 Сообщений пока нет';
-            } else {
+        // Получение сообщений
+        db.collection('messages')
+            .orderBy('timestamp', 'asc')
+            .onSnapshot((snapshot) => {
+                chatDiv.innerHTML = '';
+                if (snapshot.empty) {
+                    statusDiv.textContent = '📭 Нет сообщений';
+                    return;
+                }
                 snapshot.forEach((doc) => {
                     const data = doc.data();
                     const msgDiv = document.createElement('div');
@@ -82,14 +153,11 @@
                 });
                 chatDiv.scrollTop = chatDiv.scrollHeight;
                 statusDiv.textContent = '📨 ' + snapshot.size + ' сообщений';
-            }
-        }, (error) => {
-            statusDiv.textContent = '❌ Ошибка чтения: ' + error.message;
-        });
+            }, (error) => {
+                statusDiv.textContent = '❌ Ошибка чтения: ' + error.message;
+            });
 
-    // Имя из localStorage
-    if (localStorage.getItem('userName')) {
-        nameInput.value = localStorage.getItem('userName');
-    }
-    msgInput.focus();
-</script>
+        msgInput.focus();
+    </script>
+</body>
+</html>
